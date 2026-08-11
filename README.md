@@ -40,7 +40,9 @@ main.py  (组装根 / Composition Root：依赖注入集中点)
    │
    ├─ infrastructure/ 实现层（具体策略，可替换）
    │   ├─ llm_providers.py   OpenAICompatible / Mock（DeepSeek/OpenAI/Ollama 通用）
-   │   ├─ whisper_stt.py     faster-whisper
+   │   ├─ whisper_stt.py     faster-whisper（本地引擎）
+   │   ├─ edge_stt.py        微软 Edge 云语音识别（免费高精度，对标 kikitan）
+   │   ├─ silero_vad.py      Silero V5 神经网络 VAD（抗音乐，对标 kikitan）
    │   ├─ osc_chatbox.py     VRChat OSC 聊天框
    │   ├─ console_chatbox.py 控制台输出（调试）
    │   ├─ hotkey_trigger.py  F8 触发（私人通道，策略实现）
@@ -159,7 +161,9 @@ cp .env.example .env   # 编辑 .env 填入 LLM_API_KEY
 | `LLM_BASE_URL` | api.deepseek.com | 换服务商时改（ollama: `http://<ip>:11434/v1`） |
 | `LLM_MODEL` | deepseek-chat | 如 gpt-4o-mini、gemma4:12b |
 | `CHATBOX_CHANNEL` | osc | osc / console（调试用） |
-| `WHISPER_MODEL` | small | tiny/base/small/medium |
+| `WHISPER_MODEL` | small | tiny/base/small/medium（whisper 引擎） |
+| `STT_ENGINE` | whisper | whisper=本地 faster-whisper / **edge=微软云端**(精度高,免费,需联网) |
+| `VAD_ENGINE` | energy | energy=能量阈值 / **silero=神经网络人声检测**(抗音乐干扰) |
 | `TRIGGER_MODE` | both | both=监听+F8双通道(默认) / auto=纯监听 / f8=纯按键 |
 | `INPUT_DEVICE` | 空 | f8 通道麦克风设备关键字（空=系统默认输入） |
 | `RECORD_HOTKEY` | f8 | 录音热键（f8/both 模式） |
