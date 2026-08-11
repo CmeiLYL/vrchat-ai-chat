@@ -19,6 +19,7 @@ import pyaudiowpatch as pyaudio
 from vrchat_ai.domain.events import SpeechCaptured
 from vrchat_ai.event_bus import EventBus
 from vrchat_ai.infrastructure.audio_utils import resample, to_mono
+from vrchat_ai.infrastructure.silero_vad import SileroVAD
 from vrchat_ai.infrastructure.vad import EnergyVAD
 from vrchat_ai.interfaces.speech import SpeechRecognizer
 from vrchat_ai.interfaces.trigger import AudioTrigger
@@ -81,6 +82,7 @@ class VoiceActivityTrigger(AudioTrigger):
         recognizer: SpeechRecognizer,
         sample_rate: int = 16000,
         loopback_device: str = "",          # 空=默认输出；可填关键字匹配（如 "CABLE"）
+        vad_engine: str = "energy",         # energy=能量 / silero=神经网络(抗音乐)
         threshold_db: float = -35.0,
         min_speech_s: float = 0.8,
         silence_timeout_s: float = 1.5,
@@ -90,13 +92,16 @@ class VoiceActivityTrigger(AudioTrigger):
         self._recognizer = recognizer
         self._sample_rate = sample_rate
         self._loopback_device = loopback_device
-        self._vad = EnergyVAD(
-            sample_rate=sample_rate,
-            threshold_db=threshold_db,
-            min_speech_s=min_speech_s,
-            silence_timeout_s=silence_timeout_s,
-            max_segment_s=max_segment_s,
-        )
+        if vad_engine == "silero":
+            self._vad = SileroVAD(sample_rate=sample_rate)
+        else:
+            self._vad = EnergyVAD(
+                sample_rate=sample_rate,
+                threshold_db=threshold_db,
+                min_speech_s=min_speech_s,
+                silence_timeout_s=silence_timeout_s,
+                max_segment_s=max_segment_s,
+            )
         self._queue: queue.Queue[np.ndarray] = queue.Queue(maxsize=8)
         self._src_rate = 0
         self._channels = 2

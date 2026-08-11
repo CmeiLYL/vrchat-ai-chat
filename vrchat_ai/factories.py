@@ -91,6 +91,7 @@ class ProviderFactory:
         return VoiceActivityTrigger(
             bus=bus, recognizer=self.create_recognizer(), sample_rate=self._cfg.sample_rate,
             loopback_device=self._cfg.loopback_device,
+            vad_engine=self._cfg.vad_engine,
             threshold_db=self._cfg.vad_threshold_db,
             min_speech_s=self._cfg.vad_min_speech_s,
             silence_timeout_s=self._cfg.vad_silence_timeout_s,

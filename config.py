@@ -34,6 +34,7 @@ class AppConfig:
     trigger_mode: str = "both"          # f8=按住说话 / auto=loopback监听 / both=两者同时(默认)
     input_device: str = ""              # f8: 麦克风设备关键字(空=默认输入, 如 "EDIFIER")
     loopback_device: str = ""           # auto: 捕获设备关键字(空=默认输出, 如 "CABLE")
+    vad_engine: str = "energy"          # energy=能量VAD / silero=神经网络VAD(抗音乐,对标kikitan)
     vad_threshold_db: float = -35.0     # 自动监听：语音能量阈值(dBFS)
     vad_min_speech_s: float = 0.8       # 自动监听：最短语音段
     vad_silence_timeout_s: float = 1.5  # 自动监听：静音多久算一句话结束
@@ -65,6 +66,8 @@ class AppConfig:
             problems.append("OSC 端口无效")
         if self.trigger_mode not in ("f8", "auto", "both"):
             problems.append(f"TRIGGER_MODE 无效: {self.trigger_mode}（应为 f8 / auto / both）")
+        if self.vad_engine not in ("energy", "silero"):
+            problems.append(f"VAD_ENGINE 无效: {self.vad_engine}（应为 energy / silero）")
         return problems
 
 
@@ -97,6 +100,7 @@ def load_config() -> AppConfig:
         trigger_mode=os.getenv("TRIGGER_MODE", "both"),
         input_device=os.getenv("INPUT_DEVICE", ""),
         loopback_device=os.getenv("LOOPBACK_DEVICE", ""),
+        vad_engine=os.getenv("VAD_ENGINE", "energy"),
         vad_threshold_db=_float("VAD_THRESHOLD_DB", -35.0),
         vad_min_speech_s=_float("VAD_MIN_SPEECH_S", 0.8),
         vad_silence_timeout_s=_float("VAD_SILENCE_TIMEOUT_S", 1.5),
