@@ -26,6 +26,7 @@ class AppConfig:
 
     # ---------- 语音识别 ----------
     whisper_model: str = "small"        # tiny/base/small/medium/mock
+    stt_engine: str = "whisper"         # whisper=本地 faster-whisper / edge=微软云端(精度高,需网络)
     whisper_device: str = "cpu"         # cpu / cuda
     whisper_compute: str = "int8"
     whisper_language: str = "zh"
@@ -68,6 +69,8 @@ class AppConfig:
             problems.append(f"TRIGGER_MODE 无效: {self.trigger_mode}（应为 f8 / auto / both）")
         if self.vad_engine not in ("energy", "silero"):
             problems.append(f"VAD_ENGINE 无效: {self.vad_engine}（应为 energy / silero）")
+        if self.stt_engine not in ("whisper", "edge"):
+            problems.append(f"STT_ENGINE 无效: {self.stt_engine}（应为 whisper / edge）")
         return problems
 
 
@@ -92,6 +95,7 @@ def load_config() -> AppConfig:
         chatbox_max_len=_int("CHATBOX_MAX_LEN", 144),
         chatbox_channel=os.getenv("CHATBOX_CHANNEL", "osc"),
         whisper_model=os.getenv("WHISPER_MODEL", "small"),
+        stt_engine=os.getenv("STT_ENGINE", "whisper"),
         whisper_device=os.getenv("WHISPER_DEVICE", "cpu"),
         whisper_compute=os.getenv("WHISPER_COMPUTE", "int8"),
         whisper_language=os.getenv("WHISPER_LANGUAGE", "zh"),

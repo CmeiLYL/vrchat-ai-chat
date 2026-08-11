@@ -53,6 +53,12 @@ class ProviderFactory:
     def _build_recognizer(self) -> SpeechRecognizer:
         if self._cfg.whisper_model == "mock":
             return _MockRecognizer()
+        if self._cfg.stt_engine == "edge":
+            from vrchat_ai.infrastructure.edge_stt import EdgeRecognizer, to_edge_language
+            return EdgeRecognizer(
+                language=to_edge_language(self._cfg.whisper_language),
+                sample_rate=self._cfg.sample_rate,
+            )
         return WhisperRecognizer(
             model_name=self._cfg.whisper_model,
             device=self._cfg.whisper_device,
