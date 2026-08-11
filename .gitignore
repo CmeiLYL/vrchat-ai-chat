@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# 虚拟环境
+.venv/
+
+# 凭据（含 DeepSeek API Key，禁止提交！）
+.env
+
+# 运行时产物
+last_recording.npy
+chat.log
