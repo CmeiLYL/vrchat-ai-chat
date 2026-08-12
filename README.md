@@ -1,5 +1,22 @@
 # VRChat AI 聊天（聊天框文字版）
 
+![Python](https://img.shields.io/badge/Python-3.11-3776AB)
+![License](https://img.shields.io/badge/license-MIT-green)
+![VRChat](https://img.shields.io/badge/VRChat-OSC-5865F2)
+![Architecture](https://img.shields.io/badge/架构-分层%2B设计模式-FF6B6B)
+
+> 在 VRChat 里说话 → 语音识别（STT）→ LLM 按人设生成回复 → OSC 写入游戏聊天框。
+> 分层架构 + 8 种设计模式 + JSON 人设系统，99 个测试全绿。
+
+## ✨ 特性
+
+- **双 STT 引擎**：本地 faster-whisper（离线）或微软 Edge 云端识别（中文高精度、免费、对标 kikitan）
+- **双 VAD 引擎**：能量阈值（轻量）或 Silero V5 神经网络（**音乐/环境音免疫**）
+- **三触发模式**：auto 自动监听（WASAPI loopback）/ F8 按住说话 / both 双通道同时
+- **人设系统**：`personas/*.json` 角色卡驱动，换人设改一个文件
+- **架构工程化**：分层（domain/interfaces/infrastructure/application）+ 策略/工厂/观察者/门面/责任链/组合/单例/依赖注入
+- **pytest 99 用例**：Mock LLM + Console 通道全离线，Edge 集成测试真实联网
+
 三种触发模式（`TRIGGER_MODE` 一行切换）：
 
 | 模式 | 交互 | 适用场景 |
