@@ -98,11 +98,15 @@ class EdgeRecognizer(SpeechRecognizer):
     """
 
     def __init__(self, language: str = "zh-CN", sample_rate: int = 16000,
-                 timeout: float = 30.0, idle_keepalive_s: float = 60.0) -> None:
+                 timeout: float = 30.0, idle_keepalive_s: float = 600.0,
+                 max_retries: int = 1) -> None:
         self._lang = language
         self._sr = sample_rate
         self._timeout = timeout
+        # 连接生命周期对齐 kikitan（应用级）：空闲不主动关，只有坏了才重建。
+        # 拉长到 10 分钟，避免"每句一连接"导致限流。
         self._idle_limit = idle_keepalive_s
+        self._max_retries = max_retries
         self._lock = threading.Lock()
         self._ws: websockets.WebSocketClientProtocol | None = None
         self._stream_counter = 0
@@ -118,15 +122,20 @@ class EdgeRecognizer(SpeechRecognizer):
         if len(audio) < self._sr * 0.3:  # 少于 0.3 秒视为无效
             return ""
         with self._lock:  # 多线程（F8+auto）串行使用连接
-            future = asyncio.run_coroutine_threadsafe(
-                self._recognize_async(audio), self._loop)
-            try:
-                return future.result(timeout=self._timeout + 15)
-            except Exception as exc:
-                print(f"[EDGE-STT] 识别失败: {exc}")
-                # 连接可能已坏，丢弃重建
-                asyncio.run_coroutine_threadsafe(self._close_async(), self._loop)
-                return ""
+            for attempt in range(self._max_retries + 1):
+                future = asyncio.run_coroutine_threadsafe(
+                    self._recognize_async(audio), self._loop)
+                try:
+                    return future.result(timeout=self._timeout + 15)
+                except Exception as exc:
+                    if attempt < self._max_retries:
+                        # 连接可能被服务器静默关闭：丢弃重建后重试一次
+                        print(f"[EDGE-STT] 连接异常({exc})，重建重试...")
+                        asyncio.run_coroutine_threadsafe(self._close_async(), self._loop)
+                        continue
+                    print(f"[EDGE-STT] 识别失败: {exc}")
+                    asyncio.run_coroutine_threadsafe(self._close_async(), self._loop)
+                    return ""
 
     # ---------- 协议实现 ----------
     async def _recognize_async(self, audio: np.ndarray) -> str:
@@ -171,9 +180,8 @@ class EdgeRecognizer(SpeechRecognizer):
         return display_texts[0] if display_texts else ""
 
     async def _get_ws(self) -> websockets.WebSocketClientProtocol:
-        # 空闲过久主动重建（服务器可能已静默关闭）
-        if (self._ws is not None and self._ws.state is State.OPEN
-                and time.time() - self._last_used < self._idle_limit):
+        # 连接 OPEN 就直接复用（空闲不主动关，对齐 kikitan 应用级生命周期）
+        if self._ws is not None and self._ws.state is State.OPEN:
             return self._ws
         await self._close_async()
         gec = sec_ms_gec()
