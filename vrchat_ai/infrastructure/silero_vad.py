@@ -24,11 +24,13 @@ class SileroVAD:
         pre_speech_pad_ms: int = 160,     # 段前补帧（kikitan preSpeechPadFrames 5 帧 ≈ 160ms）
         min_speech_s: float = 0.1,        # 最短语音段（kikitan minSpeechFrames 2 帧 ≈ 64ms）
         max_segment_s: float = 30.0,      # 单段上限（防无限录音）
+        pre_pad_frames: int = 5,          # pre-roll 补帧（kikitan preSpeechPadFrames=5 ≈ 160ms）
         model=None,                       # 依赖注入：测试可传 mock，默认加载真实模型
     ) -> None:
         self._sr = sample_rate
         self._min_speech = int(min_speech_s * sample_rate)
         self._max_segment = int(max_segment_s * sample_rate)
+        self._pre_pad = max(0, pre_pad_frames)
         if model is None:
             model = load_silero_vad()
         self._vad = VADIterator(
@@ -41,6 +43,13 @@ class SileroVAD:
         self._remainder = np.array([], dtype=np.float32)   # 跨块余数（512 对齐）
         self._buf = np.array([], dtype=np.float32)          # 当前语音段
         self._active = False                                # 是否处于说话中
+        self._ring: list[np.ndarray] = []                   # pre-roll 环形缓冲（字头补帧）
+
+    def _push_ring(self, frame: np.ndarray) -> None:
+        """保留最近 N 帧到环形缓冲（start 时前置进段，补回被切掉的字头）。"""
+        self._ring.append(frame)
+        if len(self._ring) > self._pre_pad:
+            self._ring.pop(0)
 
     # ---------- 状态机 ----------
     def feed(self, chunk: np.ndarray) -> list[np.ndarray]:
@@ -52,10 +61,13 @@ class SileroVAD:
 
         segments: list[np.ndarray] = []
         for frame in frames:
+            self._push_ring(frame)
             result = self._vad(frame) or {}   # silero-vad 6.x：无事件返回 None
             if "start" in result:
                 self._active = True
-                self._buf = np.array([], dtype=np.float32)
+                # pre-roll：说话前的补帧前置（当前帧已在 ring 中，由下方累积）
+                self._buf = np.concatenate(self._ring[:-1]) if len(self._ring) > 1 \
+                    else np.array([], dtype=np.float32)
             if self._active:
                 self._buf = np.concatenate([self._buf, frame])
                 if len(self._buf) >= self._max_segment:
@@ -68,6 +80,7 @@ class SileroVAD:
                     segments.append(seg)
                 self._active = False
                 self._buf = np.array([], dtype=np.float32)
+                self._ring = []   # 段结束清空补帧缓冲
         return segments
 
     def flush(self) -> np.ndarray:
@@ -76,6 +89,7 @@ class SileroVAD:
             else np.array([], dtype=np.float32)
         self._active = False
         self._buf = np.array([], dtype=np.float32)
+        self._ring = []
         return seg
 
     def reset(self) -> None:
@@ -83,4 +97,5 @@ class SileroVAD:
         self._active = False
         self._buf = np.array([], dtype=np.float32)
         self._remainder = np.array([], dtype=np.float32)
+        self._ring = []
         self._vad.reset_states()

@@ -24,16 +24,18 @@ class _MockSileroVad:
         self.reset_count += 1
 
 
-def _make_vad(events: list[dict]) -> SileroVAD:
+def _make_vad(events: list[dict], pre_pad: int = 5) -> SileroVAD:
     model = type("FakeModel", (), {})()
     vad = SileroVAD.__new__(SileroVAD)
     vad._sr = 16000
     vad._min_speech = 1600      # 0.1s
     vad._max_segment = 48000    # 3s
+    vad._pre_pad = pre_pad
     vad._vad = _MockSileroVad(events)
     vad._remainder = np.array([], dtype=np.float32)
     vad._buf = np.array([], dtype=np.float32)
     vad._active = False
+    vad._ring = []
     return vad
 
 
@@ -48,7 +50,16 @@ def test_speech_segment_detected():
     vad = _make_vad([{"start": 0}] + [{}] * 4 + [{"end": 0}])
     segs = vad.feed(np.zeros(6 * 512, dtype=np.float32))
     assert len(segs) == 1
-    assert len(segs[0]) == 6 * 512  # start 后所有帧累积
+    assert len(segs[0]) == 6 * 512  # start 帧起全部累积（无 pre-roll 前置帧）
+
+
+def test_pre_roll_prefixes_segment():
+    """pre-roll：start 前的补帧应前置进段（kikitan 字头保护）。"""
+    vad = _make_vad([{}] * 3 + [{"start": 0}, {"end": 0}])  # 3 帧环境音后说话
+    segs = vad.feed(np.zeros(5 * 512, dtype=np.float32))
+    assert len(segs) == 1
+    # 前置 3 帧环境音 + start 帧 + end 帧 = 5 帧
+    assert len(segs[0]) == 5 * 512
 
 
 def test_short_speech_filtered():

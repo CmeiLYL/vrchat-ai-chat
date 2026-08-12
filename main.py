@@ -40,7 +40,7 @@ class Application:
             max_rounds=config.max_rounds,
         )
         # 观察者演示：ReplyReady 的第二个订阅者（控制台侧边记录）
-        bus.subscribe(ReplyReady, lambda e: print(f"  ↳ [事件] ReplyReady: {e.text[:24]}..."))
+        # bus.subscribe(ReplyReady, lambda e: print(f"  ↳ [事件] ReplyReady: {e.text[:24]}..."))
 
         # 音频触发策略（f8 私人 / auto 公共），由工厂装配
         self._trigger = factory.create_trigger(bus=bus)
