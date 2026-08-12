@@ -86,19 +86,19 @@ personas/  人设角色卡（JSON）
 | VRChat | **VRChat Plus 订阅**（OSC 是 VRC+ 专属，2022 年起） |
 | VRChat 内开启 OSC | 主菜单 → 设置 → OSC → 打开 |
 | Python | 3.11（项目自带独立 venv） |
-| 麦克风 | 系统默认麦克风 |
+| 麦克风 | 默认不可靠（多声卡环境），**必须显式配置** `INPUT_DEVICE` 设备关键字 |
 
 ## 运行测试
 
 ```bash
-.venv/Scripts/python.exe -m pytest          # 全量（35 个用例，约 4s）
+.venv/Scripts/python.exe -m pytest          # 全量（99 个用例，约 12s）
 .venv/Scripts/python.exe -m pytest -v       # 详细输出
 .venv/Scripts/python.exe -m pytest tests/test_osc_chatbox.py   # 单文件
 ```
 
-- 全部离线：Mock LLM + Console 通道，不联网、不需要 VRChat/麦克风
+- 几乎全部离线（Mock LLM + Console 通道）；仅 2 个 Edge 集成测试需联网（`speech.platform.bing.com`，标记 `integration`）
 - OSC 测试起临时 UDP 端口真实收发，验证协议格式，不碰真实 9000
-- 覆盖：配置校验 / 人设 / 会话截断 / 事件总线 / 责任链 / 门面全链路 / OSC 协议 / 工厂装配 / VAD / 重采样 / 触发策略
+- 覆盖：配置校验 / 人设 / 会话截断 / 事件总线 / 责任链 / 门面全链路 / OSC 协议 / 工厂装配 / VAD（能量+Silero）/ 重采样 / 触发策略 / Edge 协议 / 语音有效性判断
 
 ## 快速开始
 
@@ -182,7 +182,24 @@ cp .env.example .env   # 编辑 .env 填入 LLM_API_KEY
 
 **录音没反应？** 检查 Windows 麦克风权限：设置 → 隐私 → 麦克风 → 允许桌面应用。
 
-**识别不准？** `WHISPER_MODEL` 改 `medium`；靠近麦克风清晰说话。
+**识别不准？**
+1. 首选 `STT_ENGINE=edge`（微软云端 ASR，中文精度远超本地 whisper small，免费无 Key）
+2. 或 `WHISPER_MODEL` 改 `medium`（本地引擎，更慢）
+3. 靠近麦克风清晰说话；多设备环境确保 `INPUT_DEVICE`/`LOOPBACK_DEVICE` 指向真实设备
+
+**Edge 识别失败（timed out during opening handshake）？**
+这是微软免费端点的**频率限流**。程序已做长连接复用（连接保持到进程退出，空闲不重建），正常使用不会触发；但若频繁重启进程/短时间密集测试仍可能被限，等待数分钟至半小时自动恢复。`VAD_ENGINE=silero` 可减少无效识别调用。
+
+**F8 按了没反应？** 确认 `.env` 里 `INPUT_DEVICE` 填了真实麦克风关键字（如 `USB2.0`）；Windows 设置 → 隐私 → 麦克风 → 允许桌面应用。
+
+## 识别引擎说明（v1.2 新增）
+
+- **STT 双引擎**（`STT_ENGINE`）：
+  - `whisper`（默认）：faster-whisper 本地运行，离线可用，small 模型约 460MB
+  - `edge`：**微软 Edge 免费云端识别**（逆向 `speech.platform.bing.com` 端点，Azure Speech 同源，对标 kikitan-translator）。中文精度高、自带服务端 VAD 抗音乐。免费无 Key，但**免费端点有频率限制**（见 FAQ）；连接为长连接复用，进程生命周期内只建一次
+- **VAD 双引擎**（`VAD_ENGINE`）：
+  - `energy`（默认）：能量阈值，轻量纯逻辑
+  - `silero`：Silero V5 神经网络人声检测（对标 kikitan），**音乐/环境音免疫**，自动切段含 pre-roll 字头保护；需联网首载模型（约 2MB，缓存于包内）
 
 ## 后续可扩展（版本 B 方向）
 

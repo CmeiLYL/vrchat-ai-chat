@@ -6,3 +6,7 @@ numpy>=1.24
 keyboard>=0.13.5
 requests>=2.31.0
 python-dotenv>=1.0.0
+# Silero VAD（VAD_ENGINE=silero 时使用，自动携带 torch 依赖，体积较大）
+silero-vad>=6.2.0
+# Edge 云端识别（STT_ENGINE=edge 时使用）
+websockets>=15.0
