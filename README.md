@@ -3,10 +3,23 @@
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![VRChat](https://img.shields.io/badge/VRChat-OSC-5865F2)
+![Tests](https://img.shields.io/badge/tests-99%20passed-34d399)
 ![Architecture](https://img.shields.io/badge/架构-分层%2B设计模式-FF6B6B)
 
-> 在 VRChat 里说话 → 语音识别（STT）→ LLM 按人设生成回复 → OSC 写入游戏聊天框。
-> 分层架构 + 8 种设计模式 + JSON 人设系统，99 个测试全绿。
+在 VRChat 里说话 → 语音识别（STT）→ LLM 按人设生成回复 → OSC 写入游戏聊天框。
+分层架构 + 8 种设计模式 + JSON 人设系统，99 个测试全绿。
+
+![工作流程](assets/readme/hero.svg)
+
+## 📑 目录
+
+- [✨ 特性](#-特性)
+- [🎬 实测效果](#-实测效果)
+- [🚀 快速开始](#-快速开始)
+- [🎮 三种触发模式](#-三种触发模式)
+- [🏗️ 架构设计](#️-架构设计分层--设计模式)
+- [⚙️ 配置项](#️-配置项)
+- [❓ 常见问题](#-常见问题)
 
 ## ✨ 特性
 
@@ -17,7 +30,28 @@
 - **架构工程化**：分层（domain/interfaces/infrastructure/application）+ 策略/工厂/观察者/门面/责任链/组合/单例/依赖注入
 - **pytest 99 用例**：Mock LLM + Console 通道全离线，Edge 集成测试真实联网
 
-三种触发模式（`TRIGGER_MODE` 一行切换）：
+## 🎬 实测效果
+
+> VRChat 公共世界里自动监听（Silero VAD + Edge 云端识别），完整对话记录：
+
+```
+[监听] 听到: 你看啊，我可以同时穿裙子同时穿的那个长裤或者短裤还有这个超短裤
+[AI] 噗哈哈哈！你这是开了时尚叠叠乐模式吗？在VRChat里确实能穿得很离谱，
+     我看过有人穿三顶帽子的呢！
+
+[触发] 你说: 我感觉这个语音输入已经登峰造极了你知道吗？
+[AI] 哈哈哈，我就说嘛！你刚才说话一会儿像机器人，一会儿又像军事专家，
+     原来是语音输入在搞怪！
+
+[监听] 听到: 现在车里温度合适吗叶经理
+[AI] 诶？叶经理？您这是在跟谁说话呀？我可是一直好好待在VRChat里的小星哦！
+```
+
+音乐/环境音由 VAD 过滤、不进 LLM；识别、回复、上屏全链路实测通过。
+
+## 🎮 三种触发模式
+
+`TRIGGER_MODE` 一行切换：
 
 | 模式 | 交互 | 适用场景 |
 |---|---|---|
@@ -37,7 +71,43 @@ F8 + 麦克风（你的语音） ──────┘
 > 已知坑：loopback 通道数必须匹配源流（如 SteelSeries Sonar 是 8ch/96kHz），
 > 代码已自动用设备原生配置并带降级重试。
 
-## 架构设计（分层 + 设计模式）
+## 🚀 快速开始
+
+```bash
+# 1. 安装依赖
+uv venv --python 3.11 .venv
+uv pip install --python .venv/Scripts/python.exe -r requirements.txt
+
+# 2. 配置 LLM Key
+cp .env.example .env   # 编辑 .env 填入 LLM_API_KEY
+
+# 3. 离线自测（不联网、不需要 VRChat）
+.venv/Scripts/python.exe main.py --selftest
+
+# 4. 启动
+.venv/Scripts/python.exe main.py
+```
+
+启动后（默认 both 双通道）：
+- **自动监听**：VRChat 里任何人说话自动回复（建议先跑 `tools/probe_audio.py` 验证捕获设备）
+- **F8 插话**：按住 F8 说话，松开即发送，可随时打断/私聊
+- 纯 auto / 纯 f8 模式改 `.env` 的 `TRIGGER_MODE` 即可
+- Ctrl+C 退出
+
+### 公共模式（auto）调通三步
+
+```bash
+# 1. 探测：VRChat 里说话/放音乐，观察能量条是否跳动
+.venv/Scripts/python.exe tools/probe_audio.py
+
+# 2. 切公共模式：.env 设 TRIGGER_MODE=auto
+#    （可选调 VAD_THRESHOLD_DB / VAD_SILENCE_TIMEOUT_S）
+
+# 3. 启动
+.venv/Scripts/python.exe main.py
+```
+
+## 🏗️ 架构设计（分层 + 设计模式）
 
 依赖方向向内，高层只依赖抽象（依赖倒置）：
 
@@ -117,43 +187,7 @@ personas/  人设角色卡（JSON）
 - OSC 测试起临时 UDP 端口真实收发，验证协议格式，不碰真实 9000
 - 覆盖：配置校验 / 人设 / 会话截断 / 事件总线 / 责任链 / 门面全链路 / OSC 协议 / 工厂装配 / VAD（能量+Silero）/ 重采样 / 触发策略 / Edge 协议 / 语音有效性判断
 
-## 快速开始
-
-```bash
-# 1. 安装依赖
-uv venv --python 3.11 .venv
-uv pip install --python .venv/Scripts/python.exe -r requirements.txt
-
-# 2. 配置 LLM Key
-cp .env.example .env   # 编辑 .env 填入 LLM_API_KEY
-
-# 3. 离线自测（不联网、不需要 VRChat）
-.venv/Scripts/python.exe main.py --selftest
-
-# 4. 启动
-.venv/Scripts/python.exe main.py
-```
-
-启动后（默认 both 双通道）：
-- **自动监听**：VRChat 里任何人说话自动回复（建议先跑 `tools/probe_audio.py` 验证捕获设备）
-- **F8 插话**：按住 F8 说话，松开即发送，可随时打断/私聊
-- 纯 auto / 纯 f8 模式改 `.env` 的 `TRIGGER_MODE` 即可
-- Ctrl+C 退出
-
-## 公共模式（auto）上手步骤
-
-```bash
-# 1. 探测：VRChat 里说话/放音乐，观察能量条是否跳动
-.venv/Scripts/python.exe tools/probe_audio.py
-
-# 2. 切公共模式
-# .env 里设 TRIGGER_MODE=auto（可选调 VAD_THRESHOLD_DB / VAD_SILENCE_TIMEOUT_S）
-
-# 3. 启动
-.venv/Scripts/python.exe main.py
-```
-
-## 人设系统
+## 🧑🎤 人设系统
 
 `personas/*.json` 即角色卡，换角色 = 加一个 JSON 文件：
 
@@ -169,7 +203,7 @@ cp .env.example .env   # 编辑 .env 填入 LLM_API_KEY
 }
 ```
 
-## 配置项
+## ⚙️ 配置项
 
 | 环境变量 | 默认 | 说明 |
 |---|---|---|
@@ -190,7 +224,7 @@ cp .env.example .env   # 编辑 .env 填入 LLM_API_KEY
 
 > ⚠️ Ollama 远程模型（如 gemma4:12b）响应 80~135s，聊天体验差，建议 API 服务。
 
-## 常见问题
+## ❓ 常见问题
 
 **聊天框没字？**
 1. 确认 VRChat 里 OSC 已开启（设置 → OSC），且有 VRC+
